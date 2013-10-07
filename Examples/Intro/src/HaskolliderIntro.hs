@@ -10,6 +10,15 @@ import Control.Concurrent
 import Data.Maybe
 import Haskollider.Server
 
+{-
+	Test code for Haskollider. First start SC and boot the server. Next, you'll need a Synth named "TestSine"; Something like this:
+	SynthDef.new("TestSine", {
+		arg freq = 440, amp = 0.2;
+		var env = EnvGen.ar(Env.perc(0, 0.5), doneAction: 2);
+		Out.ar(0, SinOsc.ar(freq, 0 , env * amp).dup);
+	}).store;
+-}
+
 main :: IO ()
 main = let 
 	server = defaultServer
