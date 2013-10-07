@@ -65,7 +65,7 @@ sendCollection buf collection startFrame = if (length collection) > (((numFrames
 							currentSample = (pos * maxSize)
 							bundleSize = min maxSize ((length collection) - currentSample)
 							samplesMessage = Message "/b_set" $ [int32 (bufnum buf)] ++ (foldl foldDatum [] [currentSample..(currentSample + (bundleSize - 1))])
-								where foldDatum = (\acc2 i -> acc2 ++ [int32 i, double (collection !! i)])
+								where foldDatum = (\acc2 i -> acc2 ++ [int32 i, float (collection !! i)])
 
 sinList :: Double -> [Double]
 sinList s = map (\x -> sin (x / s)) [1..s]

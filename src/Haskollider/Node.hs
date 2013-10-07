@@ -35,16 +35,16 @@ run :: Node a => a -> Bool -> Message
 run n b = Message "/n_run" [int32 (nodeID n), int32 (flag b)]
 
 set :: Node a => a -> String -> Double -> Message
-set n arg val = Message "/n_set" [int32 (nodeID n), string arg, double val]
+set n arg val = Message "/n_set" [int32 (nodeID n), string arg, float val]
 
 setList :: Node a => a -> ControlList -> Message
 setList n xs = Message "/n_set" $ int32 (nodeID n) : (controlToDatum xs)
 
 setn :: Node a => a -> Int -> Int -> [Double] -> Message
-setn n firstIndex numIndexes values = Message "/n_setn" $ [int32 (nodeID n), int32 firstIndex, int32 numIndexes ] ++ (map (double) values)
+setn n firstIndex numIndexes values = Message "/n_setn" $ [int32 (nodeID n), int32 firstIndex, int32 numIndexes ] ++ (map (float) values)
 
 fill :: Node a => a -> Int -> Int -> Double -> Message
-fill n firstIndex numIndexes value = Message "/n_fill" $ [int32 (nodeID n), int32 firstIndex, int32 numIndexes, double value]
+fill n firstIndex numIndexes value = Message "/n_fill" $ [int32 (nodeID n), int32 firstIndex, int32 numIndexes, float value]
 
 release :: Node a => a -> Double -> Message
 release n releaseTime = set n "gate" ((-1.0) - releaseTime)

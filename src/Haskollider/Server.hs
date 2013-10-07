@@ -295,3 +295,40 @@ testSC = let
 			else return()
 
 	in evalStateT (synths 80 1) server
+
+{- 
+	More test code for Haskollider. First start SC and boot the server. Next, you'll need a Synth named "TestSine2"; Something like this:
+	
+	SynthDef.new("TestSine2", {
+		arg freq = 440, amp = 0.2, gate = 1;
+		var env = EnvGen.ar(Env.asr(0, 1, 0.5), gate: gate, doneAction: 2);
+		Out.ar(0, SinOsc.ar(freq, 0 , env * amp).dup);
+	}).store;
+	
+	Next, make sure you have Haskollider compiled and installed (cabal build && cabal install). Finally, open up ghci and run
+	:m Haskollider.Server
+	testSC2
+-}
+
+testSC2 :: IO ()
+testSC2 = let 
+	server = defaultServer
+	synth f = sendSynth $ newSynth "TestSine2" [("freq", f)]
+	
+	runSynths = do
+		synth1 <- synth 160.0
+		synth2 <- synth 160.0
+		synths synth1 synth2 80 1
+
+	synths :: Synth -> Synth -> Double -> Int -> StateT Server IO ()
+	synths synth1 synth2 fundamental n = do
+		send $ set synth1 "freq" (fundamental * fromIntegral (mod n 9 + 1))
+		send $ set synth2 "freq" (fundamental * fromIntegral (mod n 7 + 1))
+		lift $ threadDelay 100000
+		if n < 1000
+			then synths synth1 synth2 fundamental (n + 4)
+			else do
+				send $ set synth1 "gate" 0
+				send $ set synth2 "gate" 0
+
+	in evalStateT (runSynths) server
