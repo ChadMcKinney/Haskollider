@@ -10,7 +10,7 @@ data Buffer = Buffer {
 	numChannels :: Int,
 	bufnum :: Int,
 	bMessage :: Message
-}
+} deriving (Show)
 
 instance ScSendable Buffer where
 	newMsg (Buffer _ _ _ msg) = msg
@@ -47,8 +47,8 @@ write :: Buffer -> String -> String -> String -> Int -> Int -> Bool -> Message
 write buf path headerFormat sampleFormat startFrame frames leaveOpen = Message "/b_write" args
 	where args = [int32 (bufnum buf), string path, string headerFormat, string sampleFormat, int32 frames, int32 startFrame, int32 (flag leaveOpen)] 
 
-free :: Buffer -> Message
-free buf = Message "/b_free" [int32 (bufnum buf)]
+freeBuf :: Buffer -> Message
+freeBuf buf = Message "/b_free" [int32 (bufnum buf)]
 
 close :: Buffer -> Message
 close buf = Message "/b_close" [int32 (bufnum buf)]

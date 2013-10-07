@@ -101,8 +101,9 @@ data Server = Server {
 	audioBusAllocator :: PowerOfTwoAllocator,
 	bufferAllocator :: PowerOfTwoAllocator,
 	rootNode :: Group,
-	defaultGroup :: Group
-
+	defaultGroup :: Group,
+	recordBuf :: Maybe Buffer,
+	recordNode :: Maybe Synth
 } deriving (Show)
 
 defaultServer :: Server
@@ -129,7 +130,9 @@ defaultServer = Server {
 	audioBusAllocator = newPowerOfTwoAllocator (sNumAudioBusChannels defaultServerOptions),
 	bufferAllocator = newPowerOfTwoAllocator (sNumBuffers defaultServerOptions),
 	rootNode = newGroup rootNodeID, -- If you've already started scsynth from Supercollider these will be created by default
-	defaultGroup = newGroup defaultGroupID
+	defaultGroup = newGroup defaultGroupID,
+	recordBuf = Nothing,
+	recordNode = Nothing
 }
 
 data ServerCommand = None |	Notify| Status | Quit | Cmd | D_recv | D_load | D_loadDir | D_freeAll | S_new | N_trace | N_free | N_run | N_cmd | N_map | 
@@ -221,6 +224,45 @@ sendBuffer f = do (allocBuffer 1) >>= (\i -> let b = buf i in do sendBuf b; retu
 		buf Nothing = Nothing
 		sendBuf (Just b) = send $ newMsg b
 		sendBuf Nothing = do lift $ print "No more buffer numbers -- free some buffers before allocating more."; return ()
+
+
+record :: String -> StateT Server IO ()
+record path = do
+	server <- get
+	if isNothing (recordBuf server) then (prepareForRecording path) else return ()
+	if isNothing (recordNode server) 
+		then do
+			rNode <- sendSynth $ synthTail (rootNode server) "server-record" [("bufnum", fromIntegral . bufnum . fromJust $ recordBuf server)]
+			put (server { recordNode = Just rNode })
+		else send $ run (fromJust $ recordNode server) True
+
+pauseRecording :: StateT Server IO ()
+pauseRecording = do
+	server <- get
+	if isJust (recordNode server) 
+		then send $ run (fromJust $ recordNode server) False 
+		else lift $ print "Warning: Not recording"
+
+stopRecording :: StateT Server IO ()
+stopRecording = do
+	server <- get
+	if isJust (recordNode server) 
+		then do
+			send $ freeNode (fromJust $ recordNode server)
+			send $ close (fromJust $ recordBuf server)
+			send $ freeBuf (fromJust $ recordBuf server)
+			put (server { recordNode = Nothing, recordBuf = Nothing })
+		else lift $ print "Warning: Not recording"
+
+prepareForRecording :: String -> StateT Server IO ()
+prepareForRecording path = do
+	server <- get
+	rBuf <- sendBuffer $ alloc 65536 (serverRecChannels server)
+	case rBuf of
+		Nothing -> return ()
+		Just buf -> send $ write buf path (serverRecHeaderFormat server) (serverRecSampleFormat server) 0 0 True
+	put (server { recordBuf = rBuf }) 
+
 {- 
 	Test code for Haskollider. First start SC and boot the server. Next, you'll need a Synth named "TestSine"; Something like this:
 	

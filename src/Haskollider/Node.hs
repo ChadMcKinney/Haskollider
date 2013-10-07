@@ -28,8 +28,8 @@ controlToDatum cl = (foldr (\(arg, val) acc -> string arg : float val : acc) [] 
 class Node a where
 	nodeID :: a -> NodeID
 
-free :: Node a => a -> Message
-free n = Message "/n_free" [int32 (nodeID n)]
+freeNode :: Node a => a -> Message
+freeNode n = Message "/n_free" [int32 (nodeID n)]
 
 run :: Node a => a -> Bool -> Message
 run n b = Message "/n_run" [int32 (nodeID n), int32 (flag b)]
