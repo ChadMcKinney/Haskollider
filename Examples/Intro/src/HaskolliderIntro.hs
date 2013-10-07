@@ -22,7 +22,7 @@ import Haskollider.Server
 main :: IO ()
 main = let 
 	server = defaultServer
-	synth f = sendNode $ newSynth "TestSine" [("freq", fromIntegral f)] 	
+	synth f = sendSynth $ newSynth "TestSine" [("freq", fromIntegral f)] 	
 	synths fundamental n = do
 		synth $ fundamental * (mod n 8 + 1)
 		synth $ fundamental * (mod n 7 + 1)
