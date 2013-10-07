@@ -1,0 +1,2 @@
+-- September 28, 2013
+Initial Project creation. Goals: Use hosc to create a libsc++ like library for Haskell. This library should provide types and functions similar to the SuperCollider language. These will not be exhaustive, but only the bare minimums including: Buffer, Bus, Server, NetAddr, Node, Group, and Synth. 

@@ -1,0 +1,26 @@
+Name:                   HaskolliderIntro
+Version:                0.1
+Description:            Introduction to using Haskollider
+License:                GPL
+License-file:           LICENSE
+Author:                 Chad McKinney and Curtis McKinney
+Maintainer:             seppukuzombie@gmail.com
+Build-Type:             Simple
+Cabal-Version:          >=1.2
+Executable HaskolliderIntro
+    Main-is:            HaskolliderIntro.hs
+    hs-source-dirs:     src
+    extensions:         FlexibleInstances InstanceSigs RankNTypes
+    Build-Depends:     
+        base >= 3 && < 5,
+        base          < 5,
+        mtl          == 2.1.*,
+        pretty       == 1.1.*,
+        stm          == 2.4.*,
+        transformers == 0.3.*,
+        containers,
+        vector,
+        network,
+        hosc,
+        Haskollider,
+        bits

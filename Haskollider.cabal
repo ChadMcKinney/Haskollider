@@ -1,0 +1,32 @@
+Name:               Haskollider
+Version:            0.0.1
+Description:        Haskell Client for the SuperCollider synthesis server scsynth
+License:            GPL
+License-file:       LICENSE
+Author:             Chad McKinney and Curtis McKinney
+Maintainer:         seppukuzombie@gmail.com
+Build-Type:			Simple
+Build-Depends:      base >= 3 && < 5,
+        			base          < 5,
+        			mtl          == 2.1.*,
+        			pretty       == 1.1.*,
+        			stm          == 2.4.*,
+        			transformers == 0.3.*,
+        			containers,
+        			vector,
+        			hosc,
+        			network,
+                                bits
+
+Data-Files:			DevNotes.txt
+hs-source-dirs:     src
+Exposed-modules:	Haskollider
+			Haskollider.Server
+			Haskollider.Node
+			Haskollider.Buffer
+			Haskollider.Bus
+			Haskollider.NetAddr
+                        Haskollider.Osc
+                        Haskollider.Engine
+                        Haskollider.Integer
+                        Haskollider.Util
