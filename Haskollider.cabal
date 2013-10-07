@@ -16,7 +16,8 @@ Build-Depends:      base >= 3 && < 5,
         			vector,
         			hosc,
         			network,
-                                bits
+                                bits,
+                                time
 
 Data-Files:			DevNotes.txt
 hs-source-dirs:     src

@@ -27,6 +27,8 @@ main = let
 		synth $ fundamental * (mod n 8 + 1)
 		synth $ fundamental * (mod n 7 + 1)
 		lift $ threadDelay 100000
-		synths fundamental (n + 1)
+		if n < 200
+			then synths fundamental (n + 1)
+			else return()
 
 	in evalStateT (synths 80 1) server

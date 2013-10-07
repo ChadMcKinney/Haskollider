@@ -11,6 +11,8 @@ import Sound.OSC
 import Control.Monad.State
 import Control.Concurrent
 import Data.Maybe
+import Data.Time (UTCTime, getCurrentTime)
+import Data.Time.LocalTime
 
 -- | Data types
 
@@ -230,10 +232,11 @@ record :: String -> StateT Server IO ()
 record path = do
 	server <- get
 	if isNothing (recordBuf server) then (prepareForRecording path) else return ()
+	server' <- get
 	if isNothing (recordNode server) 
 		then do
-			rNode <- sendSynth $ synthTail (rootNode server) "server-record" [("bufnum", fromIntegral . bufnum . fromJust $ recordBuf server)]
-			put (server { recordNode = Just rNode })
+			rNode <- sendSynth $ synthTail (rootNode server) "server-record" [("bufnum", fromIntegral . bufnum . fromJust $ recordBuf server')]
+			put (server' { recordNode = Just rNode })
 		else send $ run (fromJust $ recordNode server) True
 
 pauseRecording :: StateT Server IO ()
@@ -258,9 +261,11 @@ prepareForRecording :: String -> StateT Server IO ()
 prepareForRecording path = do
 	server <- get
 	rBuf <- sendBuffer $ alloc 65536 (serverRecChannels server)
+	now <- lift getCurrentTime
 	case rBuf of
 		Nothing -> return ()
-		Just buf -> send $ write buf path (serverRecHeaderFormat server) (serverRecSampleFormat server) 0 0 True
+		Just buf -> send $ write buf newPath (serverRecHeaderFormat server) (serverRecSampleFormat server) 0 0 True
+			where newPath = filter (==' ') (path ++ "SC_" ++ (show now) ++ "." ++ (serverRecHeaderFormat server))
 	put (server { recordBuf = rBuf }) 
 
 {- 
@@ -285,6 +290,8 @@ testSC = let
 		synth $ fundamental * (mod n 8 + 1)
 		synth $ fundamental * (mod n 7 + 1)
 		lift $ threadDelay 100000
-		synths fundamental (n + 1)
+		if n < 200
+			then synths fundamental (n + 1)
+			else return()
 
 	in evalStateT (synths 80 1) server

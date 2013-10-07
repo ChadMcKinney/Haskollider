@@ -23,4 +23,5 @@ Executable HaskolliderIntro
         network,
         hosc,
         Haskollider,
-        bits
+        bits,
+        time
