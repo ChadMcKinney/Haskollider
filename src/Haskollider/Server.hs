@@ -6,6 +6,7 @@ import Haskollider.NetAddr
 import Haskollider.Engine
 import Haskollider.Node
 import Haskollider.Util
+import Haskollider.Buffer
 import Sound.OSC
 import Control.Monad.State
 import Control.Concurrent
@@ -207,17 +208,19 @@ send m = do
 sendNew :: ScSendable a => (Int -> a) -> StateT Server IO a
 sendNew f = do nextNodeID >>= (\i -> let n = f i in do (send $ newMsg n); return n)
 
-sendNode :: ScSendable a => (Int -> a) -> StateT Server IO a
-sendNode = sendNew
+sendSynth :: (Int -> Synth) -> StateT Server IO Synth
+sendSynth = sendNew
 
-sendGroup :: ScSendable a => (Int -> a) -> StateT Server IO a
+sendGroup :: (Int -> Group) -> StateT Server IO Group
 sendGroup = sendNew
 
-sendBuffer :: ScSendable a => (Int -> a) -> StateT Server IO a
+sendBuffer :: (Int -> Buffer) -> StateT Server IO (Maybe Buffer)
 sendBuffer f = do (allocBuffer 1) >>= (\i -> let b = buf i in do sendBuf b; return b)
 	where
-		buf i = if isJust i then f (fromJust i) else f (-1)
-		sendBuf b = send $ newMsg b
+		buf (Just i) = Just $ f i
+		buf Nothing = Nothing
+		sendBuf (Just b) = send $ newMsg b
+		sendBuf Nothing = do lift $ print "No more buffer numbers -- free some buffers before allocating more."; return ()
 {- 
 	Test code for Haskollider. First start SC and boot the server. Next, you'll need a Synth named "TestSine"; Something like this:
 	
@@ -235,7 +238,7 @@ sendBuffer f = do (allocBuffer 1) >>= (\i -> let b = buf i in do sendBuf b; retu
 testSC :: IO ()
 testSC = let 
 	server = defaultServer
-	synth f = sendNode $ newSynth "TestSine" [("freq", fromIntegral f)] 	
+	synth f = sendSynth $ newSynth "TestSine" [("freq", fromIntegral f)] 	
 	synths fundamental n = do
 		synth $ fundamental * (mod n 8 + 1)
 		synth $ fundamental * (mod n 7 + 1)
