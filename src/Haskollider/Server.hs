@@ -261,14 +261,17 @@ sendBuffer f = do (allocBuffer 1) >>= (\i -> let b = buf i in do sendBuf b; retu
 		sendBuf (Just b) = send $ newMsg b
 		sendBuf Nothing = do lift $ print "No more buffer numbers -- free some buffers before allocating more."; return ()
 
-record :: String -> StateT Server IO ()
-record path = do
+loadDirectory :: String -> StateT Server IO ()
+loadDirectory dir = send $ Message "/d_loadDir" [string dir]
+
+record :: StateT Server IO ()
+record = do
+	prepareForRecording
 	server <- get
-	if isNothing (recordBuf server) then (prepareForRecording path) else return ()
-	server' <- get
 	if isNothing (recordNode server) 
 		then do
-			rNode <- sendSynth $ synthTail (rootNode server) "server-record" [("bufnum", fromIntegral . bufnum . fromJust $ recordBuf server')]
+			rNode <- sendSynth $ synthTail (rootNode server) "server-record" [("bufnum", fromIntegral . bufnum . fromJust $ recordBuf server)]
+			server' <- get
 			put (server' { recordNode = Just rNode })
 		else send $ run (fromJust $ recordNode server) True
 
@@ -290,16 +293,20 @@ stopRecording = do
 			put (server { recordNode = Nothing, recordBuf = Nothing })
 		else lift $ print "Warning: Not recording"
 
-prepareForRecording :: String -> StateT Server IO ()
-prepareForRecording path = do
+prepareForRecording :: StateT Server IO ()
+prepareForRecording = do
 	server <- get
-	rBuf <- sendBuffer $ alloc 65536 (serverRecChannels server)
-	now <- lift getCurrentTime
-	case rBuf of
-		Nothing -> return ()
-		Just buf -> send $ write buf newPath (serverRecHeaderFormat server) (serverRecSampleFormat server) 0 0 True
-			where newPath = filter (==' ') (path ++ "SC_" ++ (show now) ++ "." ++ (serverRecHeaderFormat server))
-	put (server { recordBuf = rBuf }) 
+	if isJust (recordBuf server) then return () else do
+		rBuf <- sendBuffer $ alloc 65536 (serverRecChannels server)
+		now <- lift getCurrentTime
+		case rBuf of
+			Nothing -> return ()
+			Just buf -> do
+				lift $ putStrLn ("prepareForRecording path: " ++ newPath)
+				send $ write buf newPath (serverRecHeaderFormat server) (serverRecSampleFormat server) 0 0 True
+					where newPath = filter (/=' ') ("SC_" ++ (show now) ++ "." ++ (serverRecHeaderFormat server))
+
+		put (server { recordBuf = rBuf }) 
 
 -- Create the default groups on the scsynth server. This is useful if you're starting it from the cml or otherwise not from sclang.
 sendDefaultGroup :: Server -> IO ()
@@ -433,7 +440,7 @@ testSC2 = let
 	in evalStateT (runSynths) server
 
 {-
-	Server Process control test
+	Server Process control test. This assumes you're on a unixy system with supercollider installed and with scsynth in your path.
 -}
 
 testSC3 :: IO ()
@@ -451,7 +458,10 @@ testSC3 = evalStateT (runSC) server
 		runSC :: StateT Server IO ()
 		runSC = do
 			boot
+			lift $ threadDelay 1000000
+			record
 			synths 80 1
+			stopRecording
 			quit
 
 
