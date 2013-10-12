@@ -17,7 +17,9 @@ Build-Depends:      base >= 3 && < 5,
         			hosc,
         			network,
                                 bits,
-                                time
+                                time,
+                                process,
+                                unix
 
 Data-Files:			DevNotes.txt
 hs-source-dirs:     src

@@ -11,11 +11,8 @@ import Sound.OSC
 import Control.Monad.State
 import Control.Concurrent
 import Data.Maybe
-import Data.Time
-import Data.List
-import System.Process
-import System.IO
-import System.Posix.Env
+import Data.Time (UTCTime, getCurrentTime)
+import Data.Time.LocalTime
 
 -- | Data types
 
@@ -23,12 +20,6 @@ data Protocol = Tcp | Udp deriving (Eq, Show)
 
 -- ServerType, distinguishes between an internal server or local host scsynth instance. LocalHost by default
 data ServerType = LocalHost | InternalServer deriving(Eq, Show)
-
--- ServerProcess is just binds together the various handles returned from createProcess
-data ServerProcess = ServerProcess { stdIn :: Handle, stdOut :: Handle, stdErr :: Handle, process :: ProcessHandle }
-
-instance Show ServerProcess where
-	show (ServerProcess _ _ _ _) = "ServerProcess: Booted"
 
 -- ServerOptions, a group of options passed to the server on creation.
 data ServerOptions = ServerOptions {
@@ -53,7 +44,7 @@ data ServerOptions = ServerOptions {
 	sPreferredHardwareBufferFrameSize :: Int,
 	sRealTimeMemorySize :: Int,
 	sBlockSize :: Int,
-	sPortNum :: Int,
+	sPortNum :: Int,
 	sNumPrivateAudioBusChannels :: Int
 } deriving (Show)
 
@@ -69,8 +60,8 @@ defaultServerOptions = ServerOptions {
 	sMaxNodes = 1024,
 	sNumInputBusChannels = 8,
 	sNumOutputBusChannels = 8,
-	sNumBuffers = 1024,
-	sMaxSynthDefs = 2048,
+	sNumBuffers = 1026,
+	sMaxSynthDefs = 1024,
 	sProtocol = Udp,
 	sBufLength = 64,
 	sNumRGens = 64,
@@ -84,15 +75,15 @@ defaultServerOptions = ServerOptions {
 	sPreferredHardwareBufferFrameSize = 512,
 	sRealTimeMemorySize = 81920, -- Increased
 	sBlockSize = 512,
-	sPortNum = 67110, -- Don't use the default SuperCollider scsynth port to prevent clashes
+	sPortNum = 57110,
 	sNumPrivateAudioBusChannels = 112
 }
 
 -- Server, the main type used to instantiate and communicate with an scsynth instance
 data Server = Server {
 	serverName :: String,
-	serverOptions :: ServerOptions,
 	serverNetAddr :: NetAddr,
+	serverOptions :: ServerOptions,
 	serverClientID :: Int,
 	serverRunning :: Bool,
 	serverBootNotifyFirst :: Bool,
@@ -114,16 +105,14 @@ data Server = Server {
 	rootNode :: Group,
 	defaultGroup :: Group,
 	recordBuf :: Maybe Buffer,
-	recordNode :: Maybe Synth,
-	serverCmd :: String,
-	serverProcess :: Maybe ServerProcess
+	recordNode :: Maybe Synth
 } deriving (Show)
 
 defaultServer :: Server
 defaultServer = Server {
 	serverName = "Local Host",
+	serverNetAddr = newNetAddr "127.0.0.1" 57110,
 	serverOptions = defaultServerOptions,
-	serverNetAddr = newNetAddr "127.0.0.1" (sPortNum defaultServerOptions),
 	serverClientID = 0,
 	serverRunning = False,
 	serverBootNotifyFirst = False,
@@ -145,9 +134,7 @@ defaultServer = Server {
 	rootNode = newGroup rootNodeID, -- If you've already started scsynth from Supercollider these will be created by default
 	defaultGroup = newGroup defaultGroupID,
 	recordBuf = Nothing,
-	recordNode = Nothing,
-	serverCmd = "scsynth",
-	serverProcess = Nothing
+	recordNode = Nothing
 }
 
 data ServerCommand = None |	Notify| Status | Quit | Cmd | D_recv | D_load | D_loadDir | D_freeAll | S_new | N_trace | N_free | N_run | N_cmd | N_map | 
@@ -157,27 +144,6 @@ data ServerCommand = None |	Notify| Status | Quit | Cmd | D_recv | D_load | D_lo
 					 B_readChannel | G_dumpTree | G_queryTree | Error | S_newargs | N_mapa | N_mapan | N_order | NUMBER_OF_COMMANDS deriving (Show, Eq, Ord, Enum)
 
 -- | Internal functions, don't need to use these unless you have a good reason
-
--- Converts ServerOptions to a list of command line Arguments for scsynth
-optionsToCmdString :: ServerOptions -> [String]
-optionsToCmdString options = udpP ++ numAudio ++ numControl ++ numInput ++ numOutput ++ blockS ++ hardBufSize ++ 
-							 sRate ++ nBuffers ++ mNodes ++ mSDefs ++ rtMem ++ wBuf ++ logins
-	where
-		udpP = ["-u ", (show $ sPortNum options)]
-		numAudio = ["-a ", (show $ sNumAudioBusChannels options)]
-		numControl = ["-c ", (show $ sNumControlBusChannels options)]
-		numInput = ["-i ", (show $ sNumInputBusChannels options)]
-		numOutput = ["-o ", (show $ sNumOutputBusChannels options)]
-		blockS = ["-z ", (show $ sBlockSize options)]
-		hardBufSize = ["-Z ", (show $ sPreferredHardwareBufferFrameSize options)]
-		sRate = ["-S ", (show $ sPreferredSampleRate options)]
-		nBuffers = ["-b ", (show $ sNumBuffers options)]
-		mNodes = ["-n ", (show $ sMaxNodes options)]
-		mSDefs = ["-d ", (show $ sMaxSynthDefs options)]
-		rtMem = ["-m ", (show $ sRealTimeMemorySize options)]
-		wBuf = ["-w ", (show $ sMaxWireBufs options)]
-		logins = ["-l ", (show $ sMaxLogins options)]
-
 
 sendMsg :: Server -> Message -> IO ()
 sendMsg s m = sendNetAddrMsg (serverNetAddr s) m
@@ -261,13 +227,14 @@ sendBuffer f = do (allocBuffer 1) >>= (\i -> let b = buf i in do sendBuf b; retu
 		sendBuf (Just b) = send $ newMsg b
 		sendBuf Nothing = do lift $ print "No more buffer numbers -- free some buffers before allocating more."; return ()
 
+
 record :: String -> StateT Server IO ()
 record path = do
 	server <- get
 	if isNothing (recordBuf server) then (prepareForRecording path) else return ()
 	server' <- get
 	if isNothing (recordNode server) 
-		then do
+		then doc
 			rNode <- sendSynth $ synthTail (rootNode server) "server-record" [("bufnum", fromIntegral . bufnum . fromJust $ recordBuf server')]
 			put (server' { recordNode = Just rNode })
 		else send $ run (fromJust $ recordNode server) True
@@ -302,70 +269,10 @@ prepareForRecording path = do
 	put (server { recordBuf = rBuf }) 
 
 -- Create the default groups on the scsynth server. This is useful if you're starting it from the cml or otherwise not from sclang.
-sendDefaultGroup :: Server -> IO ()
-sendDefaultGroup server = sendMsg server $ Message "/g_new" [int32 defaultGroupID, int32 (fromEnum AddToHead), int32 rootNodeID]
-
-scprocessOut :: ServerProcess -> StateT Server IO (ThreadId)
-scprocessOut scProcess = do
-	server <- get
-	lift . forkIO $ outFunc server
-	where outFunc server = do
-		outContents <- hGetContents $ stdOut scProcess
-		errContents <- hGetContents $ stdErr scProcess
-
-		if(isInfixOf "SuperCollider 3 server ready." outContents) 
-			then do
-				sendMsg server notify
-				sendDefaultGroup server
-				return ()
-			else return ()
-
-		putStrLn outContents
-		putStrLn errContents
-		return ()
-
-boot :: StateT Server IO ()
-boot = do
-	lift $ putEnv "SC_JACK_DEFAULT_INPUTS=system"
-	lift $ putEnv "SC_JACK_DEFAULT_OUTPUTS=system"
-	-- automatically start jack when booting the server
-	-- can still be overridden with JACK_NO_START_SERVER
-	lift $ putEnv "JACK_START_SERVER=true"
-	server <- get
-	(mstin, mstout, msterr, pHandle) <- lift $ 
-		createProcess (proc "scsynth" (optionsToCmdString $ serverOptions server))  { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe }
-	let stList = [mstin, mstout, msterr]
-	if (any (isNothing) stList) 
-		then do 
-			lift $ putStrLn "NOTHING!"
-			return ()
-		else case stList of
-			[Just stin, Just stout, Just sterr] -> let
-				scProcess = ServerProcess stin stout sterr pHandle
-				in do
-				put (server { serverProcess = Just scProcess, serverRunning = True })	
-				scprocessOut scProcess
-				return ()
-
-quit :: StateT Server IO ()
-quit = do
-	send quitMsg
-	server <- get
-	case (serverProcess server) of
-		Nothing -> return ()
-		Just scProcess -> do
-			lift . hClose $ stdIn scProcess
-			lift . hClose $ stdOut scProcess
-			lift . hClose $ stdErr scProcess
-			lift $ waitForProcess (process scProcess)
-			put (server { serverRunning = False })
-			return ()
-
-quitMsg :: Message
-quitMsg = Message "/quit" []
-
-notify :: Message
-notify = Message "/notify" [int32 1]
+sendDefaultGroups :: StateT Server IO ()
+sendDefaultGroups = do
+	send $ Message "/g_new" [int32 rootNodeID]
+	send $ Message "/g_new" [int32 defaultGroupID, int32 (fromEnum AddToHead), int32 rootNodeID]
 
 {- 
 	Test code for Haskollider. First start SC and boot the server. Next, you'll need a Synth named "TestSine"; Something like this:
@@ -416,7 +323,8 @@ testSC2 = let
 	
 	runSynths = do
 		synth1 <- synth 160.0
-		synth2 <- synth 160.0
+		s
+                  ynth2 <- synth 160.0
 		synths synth1 synth2 80 1
 
 	synths :: Synth -> Synth -> Double -> Int -> StateT Server IO ()
@@ -434,24 +342,8 @@ testSC2 = let
 
 {-
 	Server Process control test
+
 -}
-
 testSC3 :: IO ()
-testSC3 = evalStateT (runSC) server
-	where
-		server = defaultServer
-		synth f = sendSynth $ newSynth "TestSine" [("freq", fromIntegral f)] 	
-		synths fundamental n = do
-			synth $ fundamental * (mod n 8 + 1)
-			synth $ fundamental * (mod n 7 + 1)
-			lift $ threadDelay 100000
-			if n < 200
-				then synths fundamental (n + 1)
-				else return()
-		runSC :: StateT Server IO ()
-		runSC = do
-			boot
-			synths 80 1
-			quit
-
+testSC3 = print "Hello, scsynth."
 

@@ -11,8 +11,8 @@ import Control.Monad
 ----------------
 -- | Data types
 
-createOscServer :: Int -> IO ThreadId
-createOscServer listeningPort = forkIO $ withTransport server f
+createOscServer :: Int -> (Message -> IO ()) -> IO ThreadId
+createOscServer listeningPort parseFunc = forkIO $ withTransport server f
 	where
 		server = udpServer "127.0.0.1" listeningPort
 		f = forever loop
@@ -20,7 +20,7 @@ createOscServer listeningPort = forkIO $ withTransport server f
 			receivedMessage <- recvMessage
 			case receivedMessage of
 				Nothing -> return ()
-				Just m -> parseIncomingOsc m
+				Just m -> liftIO $ parseFunc m
 			liftIO $ print receivedMessage
 
 createOscClient :: String -> Int -> IO UDP
@@ -64,5 +64,5 @@ clientLoop serverIP serverPort serverPassword = withTransport t f
 ----------------
 -- | Functions
 
-parseIncomingOsc :: Message -> Connection UDP()
-parseIncomingOsc receivedMessage = liftIO $ print receivedMessage
+parseIncomingOsc :: Message -> IO ()
+parseIncomingOsc receivedMessage = print ("OSC: " ++ (show receivedMessage))
