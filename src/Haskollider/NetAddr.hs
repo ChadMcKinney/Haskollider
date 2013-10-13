@@ -1,3 +1,4 @@
+-- |NetAddr has functions for server communication via OSC
 module Haskollider.NetAddr where
 
 import Haskollider.Osc
@@ -8,7 +9,7 @@ data NetAddr = NetAddr { netAddrHostName :: String, netAddrPortNum :: Int, oscCl
 instance Show NetAddr where
 	show (NetAddr ip port _) = "host: " ++ ip ++ ", port: " ++ (show port)
 
--- Use this for conveniance
+-- |Use this for conveniance, it creates the oscClient for you
 newNetAddr :: String -> Int -> NetAddr
 newNetAddr ip port = NetAddr ip port (createOscClient ip port)
 

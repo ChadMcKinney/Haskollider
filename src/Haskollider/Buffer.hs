@@ -1,10 +1,10 @@
--- | Haskollider.Buffer
+-- |Haskollider.Buffer module contains the set of functions for buffer control on the scsynth server
 module Haskollider.Buffer where
 
--- | Imports
 import Sound.OSC
 import Haskollider.Util
 
+-- |Buffer type that contains the number of frames, number of channels, number of the buffer itself, and message used to instance it.
 data Buffer = Buffer {
 	numFrames :: Int,
 	numChannels :: Int,
@@ -15,18 +15,21 @@ data Buffer = Buffer {
 instance ScSendable Buffer where
 	newMsg (Buffer _ _ _ msg) = msg
 
+-- |Allocate buffer message, takes a number of frames and channels, and returns a function that when given a number will return a Buffer object
 alloc :: Int -> Int -> (Int -> Buffer)
 alloc frames channels = bFunc
 	where
 		bFunc n = Buffer frames channels n (msg n)
 		msg = (\n -> Message "/b_alloc" [int32 n, int32 frames, int32 channels])
 
+-- |Similar to alloc, but takes a path to an audio file to read into the buffer
 allocRead :: String -> Int -> Int -> (Int -> Buffer)
 allocRead path startFrame frames = bFunc
 	where
 		bFunc n = Buffer frames 1 n (msg n)
 		msg = (\n -> Message "/b_allocRead" [int32 n, string path, int32 startFrame, int32 frames])
 
+-- |Similar to allocRead, but reads a specified number of channels
 allocReadChannel :: String -> Int -> Int -> Int -> (Int -> Buffer)
 allocReadChannel path startFrame frames channels = bFunc
 	where
@@ -53,6 +56,7 @@ freeBuf buf = Message "/b_free" [int32 (bufnum buf)]
 close :: Buffer -> Message
 close buf = Message "/b_close" [int32 (bufnum buf)]
 
+-- | Returns an osc message for sending a collection of values to a buffer on the server
 sendCollection :: Buffer -> [Double] -> Int -> Maybe [Message]
 sendCollection buf collection startFrame = if (length collection) > (((numFrames buf) - startFrame) * (numChannels buf))
 		then Nothing
@@ -79,7 +83,7 @@ messageListToDoubleList mm = case mm of
 				Nothing -> 0
 				Just d' -> d' 
 
--- testing our sendCollection function for correct behavior. It looks like we've got it working right!
+-- |Test for our sendCollection function. It looks like we've got it working right!
 testSendCollection :: Int -> IO (Bool)
 testSendCollection testSize =  let
 	testCollection = sinList (fromIntegral testSize)

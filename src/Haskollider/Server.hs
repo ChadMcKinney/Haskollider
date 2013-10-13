@@ -1,12 +1,12 @@
--- | Haskollider.Server defines all the types and functionals relavent to communicating with a running scsynth instances
+-- |Haskollider.Server defines all the types and functionals relavent to communicating with a running scsynth instances
 module Haskollider.Server where
 
--- | Imports
 import Haskollider.NetAddr
 import Haskollider.Engine
 import Haskollider.Node
 import Haskollider.Util
 import Haskollider.Buffer
+import qualified Haskollider.Bus as Bus
 import Sound.OSC
 import Control.Monad.State
 import Control.Concurrent
@@ -17,20 +17,20 @@ import System.Process
 import System.IO
 import System.Posix.Env
 
--- | Data types
-
+-- |Protocol to use for Osc communication with scsynth. Udp is the default for server communication.
 data Protocol = Tcp | Udp deriving (Eq, Show)
 
--- ServerType, distinguishes between an internal server or local host scsynth instance. LocalHost by default
+-- |ServerType, distinguishes between an internal server or local host scsynth instance. LocalHost by default
 data ServerType = LocalHost | InternalServer deriving(Eq, Show)
 
--- ServerProcess is just binds together the various handles returned from createProcess
+-- |ServerProcess is just binds together the various handles returned from createProcess
 data ServerProcess = ServerProcess { stdIn :: Handle, stdOut :: Handle, stdErr :: Handle, process :: ProcessHandle }
 
+-- |ServerProcess instance of show, it simply displays a booted status.
 instance Show ServerProcess where
 	show (ServerProcess _ _ _ _) = "ServerProcess: Booted"
 
--- ServerOptions, a group of options passed to the server on creation.
+-- |ServerOptions, a group of options passed to the server on creation.
 data ServerOptions = ServerOptions {
 	sNumAudioBusChannels :: Int,
 	sNumControlBusChannels :: Int,
@@ -57,10 +57,10 @@ data ServerOptions = ServerOptions {
 	sNumPrivateAudioBusChannels :: Int
 } deriving (Show)
 
-firstPrivateBus :: ServerOptions -> Int
-firstPrivateBus o = (sNumOutputBusChannels o) + (sNumOutputBusChannels o)
-
--- A default collection of ServerOptions for quick use and reference
+{-| 
+  A default collection of ServerOptions for quick use and reference. 
+  If you want to target specific arguments start here and change via record syntax.
+-}
 defaultServerOptions :: ServerOptions
 defaultServerOptions = ServerOptions { 
 	sNumAudioBusChannels = 128,
@@ -88,7 +88,7 @@ defaultServerOptions = ServerOptions {
 	sNumPrivateAudioBusChannels = 112
 }
 
--- Server, the main type used to instantiate and communicate with an scsynth instance
+-- |Server, the main type used to instantiate and communicate with an scsynth instance
 data Server = Server {
 	serverName :: String,
 	serverOptions :: ServerOptions,
@@ -119,6 +119,7 @@ data Server = Server {
 	serverProcess :: Maybe ServerProcess
 } deriving (Show)
 
+-- |A Server with typical values.
 defaultServer :: Server
 defaultServer = Server {
 	serverName = "Local Host",
@@ -156,9 +157,15 @@ data ServerCommand = None |	Notify| Status | Quit | Cmd | D_recv | D_load | D_lo
 					 B_getn | S_get | S_getn | N_query | B_query | N_mapn | S_noid | G_deepFree | ClearSched | Sync | D_free | B_allocReadChannel |
 					 B_readChannel | G_dumpTree | G_queryTree | Error | S_newargs | N_mapa | N_mapan | N_order | NUMBER_OF_COMMANDS deriving (Show, Eq, Ord, Enum)
 
--- | Internal functions, don't need to use these unless you have a good reason
+-------------------------------------------------------------------------------
+-- Internal functions, don't need to use these unless you have a good reason
+-------------------------------------------------------------------------------
 
--- Converts ServerOptions to a list of command line Arguments for scsynth
+-- |Helper function to find the first private bus
+firstPrivateBus :: ServerOptions -> Int
+firstPrivateBus o = (sNumOutputBusChannels o) + (sNumOutputBusChannels o)
+
+-- |Converts ServerOptions to a list of command line Arguments for scsynth
 optionsToCmdString :: ServerOptions -> [String]
 optionsToCmdString options = udpP ++ numAudio ++ numControl ++ numInput ++ numOutput ++ blockS ++ hardBufSize ++ 
 							 sRate ++ nBuffers ++ mNodes ++ mSDefs ++ rtMem ++ wBuf ++ logins
@@ -178,13 +185,15 @@ optionsToCmdString options = udpP ++ numAudio ++ numControl ++ numInput ++ numOu
 		wBuf = ["-w ", (show $ sMaxWireBufs options)]
 		logins = ["-l ", (show $ sMaxLogins options)]
 
-
+-- |Helper function for sending OSC messages to scsynth
 sendMsg :: Server -> Message -> IO ()
 sendMsg s m = sendNetAddrMsg (serverNetAddr s) m
 
+-- |Helper function for sending OSC bundles to scsynth
 sendBundle :: Server -> Bundle -> IO ()
 sendBundle s b = sendNetAddrBundle (serverNetAddr s) b
 
+-- |Increments the server's node counter, returning a node id.
 nextNodeID :: StateT Server IO NodeID
 nextNodeID = do
 	server <- get
@@ -192,6 +201,7 @@ nextNodeID = do
 	return $ newID server
 		where newID s = allocNodeID (currentNodeID s)
 
+-- |Allocates n number of control buses on the server
 allocControlBus :: Int -> StateT Server IO (Maybe Int)
 allocControlBus n = do
 	server <- get
@@ -199,6 +209,7 @@ allocControlBus n = do
 	return . fst $ cb server
 		where cb s = allocPTBlock (controlBusAllocator s) n
 
+-- |Frees a control bus, identified by number
 freeControlBus :: Int -> StateT Server IO ()
 freeControlBus n = do
 	server <- get
@@ -206,6 +217,7 @@ freeControlBus n = do
 	return ()
 		where fc s = freePTBlock (controlBusAllocator s) n 
 
+-- |Allocates n number of audio buses on the server
 allocAudioBus :: Int -> StateT Server IO (Maybe Int)
 allocAudioBus n = do
 	server <- get
@@ -213,6 +225,7 @@ allocAudioBus n = do
 	return . fst $ ab server
 		where ab s = allocPTBlock (audioBusAllocator s) n
 
+-- |Frees an audio bus, identified by number
 freeAudioBus :: Int -> StateT Server IO ()
 freeAudioBus n = do
 	server <- get
@@ -220,6 +233,7 @@ freeAudioBus n = do
 	return ()
 		where fa s = freePTBlock (audioBusAllocator s) n
 
+-- |Allocates n number of buffers on the server
 allocBuffer :: Int -> StateT Server IO (Maybe Int)
 allocBuffer n = do
 	server <- get
@@ -227,6 +241,7 @@ allocBuffer n = do
 	return . fst $ bb server
 		where bb s = allocPTBlock (bufferAllocator s) n
 
+-- |Frees a buffer, identified by number
 freeBuffer :: Int -> StateT Server IO ()
 freeBuffer n = do
 	server <- get
@@ -234,84 +249,11 @@ freeBuffer n = do
 	return ()
 		where fb s = freePTBlock (bufferAllocator s) n
 
--- | Below is the standard interface for using the Haskollider library.
-
--- Helper function, just wraps up the get and lift for slightly more streamlined sending. Used for things like set and free
-send :: Message -> StateT Server IO ()
-send m = do
-	s <- get
-	lift (sendMsg s m)
-
--- sendNew is a helper function for simplifying new node message sending to scsynth. It takes a function (NodeId to Node a), increments the node id
--- in the server, and returns the created Node. Eg sendNew $ newSynth "mySynth" [("arg1", value)] ... or also: sendNew $ newGroup
-sendNew :: ScSendable a => (Int -> a) -> StateT Server IO a
-sendNew f = do nextNodeID >>= (\i -> let n = f i in do (send $ newMsg n); return n)
-
-sendSynth :: (Int -> Synth) -> StateT Server IO Synth
-sendSynth = sendNew
-
-sendGroup :: (Int -> Group) -> StateT Server IO Group
-sendGroup = sendNew
-
-sendBuffer :: (Int -> Buffer) -> StateT Server IO (Maybe Buffer)
-sendBuffer f = do (allocBuffer 1) >>= (\i -> let b = buf i in do sendBuf b; return b)
-	where
-		buf (Just i) = Just $ f i
-		buf Nothing = Nothing
-		sendBuf (Just b) = send $ newMsg b
-		sendBuf Nothing = do lift $ print "No more buffer numbers -- free some buffers before allocating more."; return ()
-
-loadDirectory :: String -> StateT Server IO ()
-loadDirectory dir = send $ Message "/d_loadDir" [string dir]
-
-record :: StateT Server IO ()
-record = do
-	prepareForRecording
-	server <- get
-	if isNothing (recordNode server) 
-		then do
-			rNode <- sendSynth $ synthTail (rootNode server) "server-record" [("bufnum", fromIntegral . bufnum . fromJust $ recordBuf server)]
-			server' <- get
-			put (server' { recordNode = Just rNode })
-		else send $ run (fromJust $ recordNode server) True
-
-pauseRecording :: StateT Server IO ()
-pauseRecording = do
-	server <- get
-	if isJust (recordNode server) 
-		then send $ run (fromJust $ recordNode server) False 
-		else lift $ print "Warning: Not recording"
-
-stopRecording :: StateT Server IO ()
-stopRecording = do
-	server <- get
-	if isJust (recordNode server) 
-		then do
-			send $ freeNode (fromJust $ recordNode server)
-			send $ close (fromJust $ recordBuf server)
-			send $ freeBuf (fromJust $ recordBuf server)
-			put (server { recordNode = Nothing, recordBuf = Nothing })
-		else lift $ print "Warning: Not recording"
-
-prepareForRecording :: StateT Server IO ()
-prepareForRecording = do
-	server <- get
-	if isJust (recordBuf server) then return () else do
-		rBuf <- sendBuffer $ alloc 65536 (serverRecChannels server)
-		now <- lift getCurrentTime
-		case rBuf of
-			Nothing -> return ()
-			Just buf -> do
-				lift $ putStrLn ("prepareForRecording path: " ++ newPath)
-				send $ write buf newPath (serverRecHeaderFormat server) (serverRecSampleFormat server) 0 0 True
-					where newPath = filter (/=' ') ("SC_" ++ (show now) ++ "." ++ (serverRecHeaderFormat server))
-
-		put (server { recordBuf = rBuf }) 
-
--- Create the default groups on the scsynth server. This is useful if you're starting it from the cml or otherwise not from sclang.
+-- |Create the default group on the scsynth server. This is useful if you're starting it from the cml or otherwise not from sclang.
 sendDefaultGroup :: Server -> IO ()
 sendDefaultGroup server = sendMsg server $ Message "/g_new" [int32 defaultGroupID, int32 (fromEnum AddToHead), int32 rootNodeID]
 
+-- |Process the stdout and stderr from the running scsynth instance
 scprocessOut :: ServerProcess -> StateT Server IO (ThreadId)
 scprocessOut scProcess = do
 	server <- get
@@ -331,6 +273,108 @@ scprocessOut scProcess = do
 		putStrLn errContents
 		return ()
 
+-- |A simple Osc Message that when sent will ask scsynth to quit
+quitMsg :: Message
+quitMsg = Message "/quit" []
+
+-------------------------------------------------------------------------
+-- Below is the standard interface for using the Haskollider library.
+-------------------------------------------------------------------------
+
+-- |Helper function, just wraps up the get and lift for slightly more streamlined sending. Used for things like set and free
+send :: Message -> StateT Server IO ()
+send m = do
+	s <- get
+	lift (sendMsg s m)
+
+-- |Takes a newBus function, allocates a bus, and returns a Bus object
+sendBus :: Bus.Rate -> (Int -> Bus.Bus) -> StateT Server IO (Maybe Bus.Bus)
+sendBus r f = do (allocBus 1) >>= (\i -> return (bus i))
+	where
+		allocBus = if r == Bus.Audio then (allocAudioBus) else (allocControlBus) 
+		bus (Just i) = Just $ f i
+		bus Nothing = Nothing
+
+{-| 
+  sendNew is a helper function for simplifying new node message sending to scsynth. It takes a function (NodeId to Node a), increments the node id
+  in the server, and returns the created Node. Eg sendNew $ newSynth "mySynth" [("arg1", value)] ... or also: sendNew $ newGroup
+-}
+sendNew :: ScSendable a => (Int -> a) -> StateT Server IO a
+sendNew f = do nextNodeID >>= (\i -> let n = f i in do (send $ newMsg n); return n)
+
+-- |A Synth type based wrapper for sendNew
+sendSynth :: (Int -> Synth) -> StateT Server IO Synth
+sendSynth = sendNew
+
+-- |A Group type based wrapper for sendNew
+sendGroup :: (Int -> Group) -> StateT Server IO Group
+sendGroup = sendNew
+
+{-| 
+  Similar to sendNew, this takes a curried function (returned by various Buffer module functions) and returns a Buffer  
+  When executed a buffer is allocated on the server, passed functions takes that number and returns a function which is sent to the server
+-}
+sendBuffer :: (Int -> Buffer) -> StateT Server IO (Maybe Buffer)
+sendBuffer f = do (allocBuffer 1) >>= (\i -> let b = buf i in do sendBuf b; return b)
+	where
+		buf (Just i) = Just $ f i
+		buf Nothing = Nothing
+		sendBuf (Just b) = send $ newMsg b
+		sendBuf Nothing = do lift $ print "No more buffer numbers -- free some buffers before allocating more."; return ()
+
+-- |Requests scsynth to load a directory of compiled synth definitions
+loadDirectory :: String -> StateT Server IO ()
+loadDirectory dir = send $ Message "/d_loadDir" [string dir]
+
+-- |Begin recording, this just uses the current working directory and a generated filename based on the current time.
+record :: StateT Server IO ()
+record = do
+	prepareForRecording
+	server <- get
+	if isNothing (recordNode server) 
+		then do
+			rNode <- sendSynth $ synthTail (rootNode server) "server-record" [("bufnum", fromIntegral . bufnum . fromJust $ recordBuf server)]
+			server' <- get
+			put (server' { recordNode = Just rNode })
+		else send $ run (fromJust $ recordNode server) True
+
+-- |Pauses the current recording, if any.
+pauseRecording :: StateT Server IO ()
+pauseRecording = do
+	server <- get
+	if isJust (recordNode server) 
+		then send $ run (fromJust $ recordNode server) False 
+		else lift $ print "Warning: Not recording"
+
+-- |Stops and finalized the current recording, if any.
+stopRecording :: StateT Server IO ()
+stopRecording = do
+	server <- get
+	if isJust (recordNode server) 
+		then do
+			send $ freeNode (fromJust $ recordNode server)
+			send $ close (fromJust $ recordBuf server)
+			send $ freeBuf (fromJust $ recordBuf server)
+			put (server { recordNode = Nothing, recordBuf = Nothing })
+		else lift $ print "Warning: Not recording"
+
+-- |A helper function for created the necessary node and buffer for record. Not necessary to call this before recording.
+prepareForRecording :: StateT Server IO ()
+prepareForRecording = do
+	server <- get
+	if isJust (recordBuf server) then return () else do
+		rBuf <- sendBuffer $ alloc 65536 (serverRecChannels server)
+		now <- lift getCurrentTime
+		case rBuf of
+			Nothing -> return ()
+			Just buf -> do
+				lift $ putStrLn ("prepareForRecording path: " ++ newPath)
+				send $ write buf newPath (serverRecHeaderFormat server) (serverRecSampleFormat server) 0 0 True
+					where newPath = filter (/=' ') ("SC_" ++ (show now) ++ "." ++ (serverRecHeaderFormat server))
+
+		put (server { recordBuf = rBuf }) 
+
+-- |Boots the server, spawning a child scsynth process and established pipes for stdout and sterr
 boot :: StateT Server IO ()
 boot = do
 	lift $ putEnv "SC_JACK_DEFAULT_INPUTS=system"
@@ -354,6 +398,7 @@ boot = do
 				scprocessOut scProcess
 				return ()
 
+-- |Quits the child scsynth process
 quit :: StateT Server IO ()
 quit = do
 	send quitMsg
@@ -368,13 +413,11 @@ quit = do
 			put (server { serverRunning = False })
 			return ()
 
-quitMsg :: Message
-quitMsg = Message "/quit" []
-
+-- |A notify message, when notified scsynth will start sending update messages to sender regarding running synths, ugens, etc.
 notify :: Message
 notify = Message "/notify" [int32 1]
 
-{- 
+{-| 
 	Test code for Haskollider. First start SC and boot the server. Next, you'll need a Synth named "TestSine"; Something like this:
 	
 	SynthDef.new("TestSine", {
@@ -387,7 +430,6 @@ notify = Message "/notify" [int32 1]
 	:m Haskollider.Server
 	testSC
 -}
-
 testSC :: IO ()
 testSC = let 
 	server = defaultServer
@@ -402,7 +444,7 @@ testSC = let
 
 	in evalStateT (synths 80 1) server
 
-{- 
+{-| 
 	More test code for Haskollider. First start SC and boot the server. Next, you'll need a Synth named "TestSine2"; Something like this:
 	
 	SynthDef.new("TestSine2", {
@@ -415,7 +457,6 @@ testSC = let
 	:m Haskollider.Server
 	testSC2
 -}
-
 testSC2 :: IO ()
 testSC2 = let 
 	server = defaultServer
@@ -439,10 +480,15 @@ testSC2 = let
 
 	in evalStateT (runSynths) server
 
-{-
-	Server Process control test. This assumes you're on a unixy system with supercollider installed and with scsynth in your path.
+{-|
+	Server Process control test. Using the boot/quit functions we don't have to start SuperCollider outside of the program.
+	This assumes you're on a unixy system with supercollider installed and with scsynth in your path.
+	Also, for recording to work you need to have a "server-record" synth def like such compiled:
+	
+	SynthDef("server-record", { arg bufnum;
+		DiskOut.ar(bufnum, In.ar(0, recChannels))
+	}).store;
 -}
-
 testSC3 :: IO ()
 testSC3 = evalStateT (runSC) server
 	where

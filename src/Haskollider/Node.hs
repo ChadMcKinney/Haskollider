@@ -1,30 +1,36 @@
--- | Haskollider.Node defines a set of functions for Osc message composition that allows for the creation and control of Nodes, Synths, and Groups in scsynth 
+-- |Haskollider.Node defines a set of functions for Osc message composition that allows for the creation and control of Nodes, Synths, and Groups in scsynth 
 module Haskollider.Node where
 
--- | Imports
 import Sound.OSC
 import Haskollider.Engine
 import Haskollider.Util
 
--- | AddAction is a simple enum used to organize nodes upon creation
+-- |AddAction is a simple enum used to organize nodes upon creation
 data AddAction = AddToHead | AddToTail | AddBefore | AddAfter | AddReplace deriving (Ord, Eq, Enum)
 
+-- |Control pair is a tuple containing an argument name and value for synths
 type ControlPair = (String, Double)
+
+-- |ControlList is a list of ControlPairs, used for multipled updates
 type ControlList = [ControlPair]
 
+-- |NodeID for the root node on the server
 rootNodeID :: NodeID
 rootNodeID = 0
 
+-- |NodeID for the default group on the server
 defaultGroupID :: NodeID
 defaultGroupID = 1
 
+-- |NodeID for grain nodes. -1 is used since they won't be updated after creation. 
 grainNodeID :: NodeID
 grainNodeID = -1
 
+-- |Internal function for converting a ControlList to a list of Osc Datum
 controlToDatum :: ControlList -> [Datum]
 controlToDatum cl = (foldr (\(arg, val) acc -> string arg : float val : acc) [] cl)
 
--- Node is the abstract base class for groups and synths. Many functions are useful to any subclass such as free and moveToHead
+-- |Node is the abstract base class for groups and synths. Many functions are useful to any subclass such as free and moveToHead
 class Node a where
 	nodeID :: a -> NodeID
 
@@ -64,7 +70,7 @@ moveToHead n g = moveNodeToHead g n
 moveToTail :: Node a => a -> Group -> Message
 moveToTail n g = moveNodeToTail g n
 
--- | Group is the node subclass that defines an interface for organizing contained nodes
+-- |Group is the node subclass that defines an interface for organizing contained nodes
 data Group = Group NodeID Message deriving (Show)
 
 instance Node Group where
@@ -88,12 +94,14 @@ deepFree g = Message "/g_deepFree" [int32 (nodeID g)]
 dumpTree :: Group -> Message
 dumpTree g = Message "/g_dumpTree" [int32 (nodeID g)]
 
+-- |A curried function that takes a NodeID and returns a Group object. Use in conjunction with sendGroup
 newGroup :: (NodeID -> Group)
 newGroup = gFunc
 	where
 		gFunc groupID = Group groupID (nMsg groupID) 
 		nMsg = (\groupID -> Message "/g_new" [int32 groupID, int32 (fromEnum AddToHead), int32 defaultGroupID])
 
+-- |Given a target node and AddAction, returns a curried functions that given a NodeID will return a Group
 newGroup' :: Node a => a -> AddAction -> (NodeID -> Group)
 newGroup' target action = gFunc
 	where
@@ -115,7 +123,7 @@ groupTail target = newGroup' target AddToTail
 groupReplace :: Node a => a -> (NodeID -> Group)
 groupReplace target = newGroup' target AddReplace
 
--- | Synth is a Node subclass for nodes that actual generate audio and control output in scsynth
+-- |Synth is a Node subclass for nodes that actual generate audio and control output in scsynth
 data Synth = Synth String NodeID Message deriving (Show)
 
 instance Node Synth where
@@ -127,12 +135,14 @@ instance ScSendable Synth where
 synthName :: Synth -> String
 synthName (Synth sName _ _) = sName
 
+-- |Takes a SynthDef name and list of arguments/values, returns a curried function. Use with sendSynth.
 newSynth :: String -> ControlList -> (NodeID -> Synth)
 newSynth name cl = sFunc 
 	where 
 		sFunc synthID = Synth name  synthID (nMsg synthID)
 		nMsg = (\synthID -> Message "/s_new" $ [string name, int32 synthID, int32 (fromEnum AddToHead), int32 defaultGroupID] ++ (controlToDatum cl))
 
+-- |Takes a SynthDef name, list of arguments/values, target, and AddAction, returns a curried function. Use with sendSynth.
 newSynth' :: Node a => String -> ControlList -> a -> AddAction -> (NodeID -> Synth)
 newSynth' name cl target action = sFunc 
 	where 
@@ -154,8 +164,10 @@ synthTail target name cl = newSynth' name cl target AddToTail
 synthReplace :: Node a => a -> String -> ControlList -> (NodeID -> Synth)
 synthReplace target name cl = newSynth' name cl target AddReplace
 
+-- |Given a name and control list, returns an OscMessage for a grain synth. Use with send.
 grainSynth :: String -> ControlList -> Message
 grainSynth name cl = Message "/s_new" $ [string name, int32 grainNodeID, int32 (fromEnum AddToHead), int32 defaultGroupID] ++ (controlToDatum cl)
 
+-- |Given a name, control list, target, and AddAction, returns an OscMessage for a grain synth. Use with send.
 grainSynth' :: Node a => String -> ControlList -> a -> AddAction -> Message
 grainSynth' name cl target action = Message "/s_new" $ [string name, int32 grainNodeID, int32 (fromEnum action), int32 $ nodeID target] ++ (controlToDatum cl)

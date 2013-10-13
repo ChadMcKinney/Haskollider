@@ -1,11 +1,12 @@
--- | Haskollider.Bus defines the OSC message composition functions for controlling busses in scsynth
+-- |Haskollider.Bus defines the OSC message composition functions for controlling busses in scsynth
 module Haskollider.Bus where
 
--- | Imports
 import Sound.OSC
 
+-- |Bus rate algebraic type. Audio rate has a faster update rate.
 data Rate = Control | Audio deriving (Eq, Show, Enum)
 
+-- |Bus type for controlling buses in scsynth. Takes a rate, index, and number of channels
 data Bus = Bus { rate :: Rate, index :: Int, numChannels :: Int }
 
 isSettable :: Bus -> Bool
@@ -29,6 +30,7 @@ setAll bus value =  fill bus value (numChannels bus)
 setValue :: Bus -> Double -> Message
 setValue = setAll
 
+-- |Given a rate and number of channels, returns a function that takes an index and returns a bus. Use with sendBus
 newBus :: Rate -> Int -> (Int -> Bus)
 newBus r n = bFunc
 	where 

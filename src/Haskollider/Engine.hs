@@ -1,26 +1,23 @@
+-- |Engine module contains internal methods for node, buffer, and bus allocation
 module Haskollider.Engine where
 
--- | Imports
 import Haskollider.Integer
 import Debug.Trace
 import qualified Data.Vector as V
 
--- | NodeID Allocation
-
 type NodeID = Int
 
+-- |Default initial node
 initialNodeID :: NodeID
 initialNodeID = 1000
 
+-- |Given a previous node id, returns the next available node.
 allocNodeID :: NodeID -> NodeID
 allocNodeID n = (mod (n + 1) (maxBound :: Int))
 
+-- |Returns the initialNodeID, 1000
 resetNodeID :: NodeID
 resetNodeID = initialNodeID
-
--- | Bus and Buffer Allocation
-
--- | PowerOfTwoBlockAllocator
 
 data PowerOfTwoBlock = PowerOfTwoBlock { blockAddress :: Int, blockSize :: Int, blockNext :: Maybe PowerOfTwoBlock } deriving (Eq, Show)
 
@@ -75,6 +72,7 @@ freePTBlock pt address = case (allocatorArray pt) V.! address of
 			newArray = replaceBlockAt address Nothing (allocatorArray pt)
 			newFreeList = replaceBlockAt sizeClass (Just node { blockNext = (allocatorFreeList pt) V.! sizeClass }) (allocatorFreeList pt)
 
+-- |Test for the PowerOfTwoAllocator to check correct behavior.
 potAllocUnitTest :: IO()
 potAllocUnitTest = let 
 		pt = newPowerOfTwoAllocator 32

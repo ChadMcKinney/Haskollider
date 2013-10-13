@@ -1,15 +1,9 @@
--- | Haskollider.Osc facilitates the actual osc communication with a running scsynth instance.
+-- |Haskollider.Osc facilitates the actual osc communication with a running scsynth instance.
 module Haskollider.Osc where
-
--------------
--- | Imports
 
 import Control.Concurrent
 import Sound.OSC
 import Control.Monad
-
-----------------
--- | Data types
 
 createOscServer :: Int -> (Message -> IO ()) -> IO ThreadId
 createOscServer listeningPort parseFunc = forkIO $ withTransport server f
@@ -60,9 +54,6 @@ clientLoop serverIP serverPort serverPassword = withTransport t f
 		f = sendMessage loginMessage
 
 -}
-
-----------------
--- | Functions
 
 parseIncomingOsc :: Message -> IO ()
 parseIncomingOsc receivedMessage = print ("OSC: " ++ (show receivedMessage))

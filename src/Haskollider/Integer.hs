@@ -1,3 +1,4 @@
+-- |Inter module contins internal functions used for block allocation
 module Haskollider.Integer where
 
 import Data.Bits
