@@ -1,8 +1,5 @@
-<<<<<<< HEAD
                     GNU GENERAL PUBLIC LICENSE
-=======
-GNU GENERAL PUBLIC LICENSE
->>>>>>> 78db2b5f8efce6d4be9fc57007715d7ea52a9d1b
+
                        Version 2, June 1991
 
  Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
@@ -294,13 +291,8 @@ to attach them to the start of each source file to most effectively
 convey the exclusion of warranty; and each file should have at least
 the "copyright" line and a pointer to where the full notice is found.
 
-<<<<<<< HEAD
-    <one line to give the program's name and a brief idea of what it does.>
-    Copyright (C) <year>  <name of author>
-=======
     Haskell library for interfacing with the SuperCollider scsynth server via OSC
     Copyright (C) 2013  Chad McKinney
->>>>>>> 78db2b5f8efce6d4be9fc57007715d7ea52a9d1b
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -338,11 +330,7 @@ necessary.  Here is a sample; alter the names:
   Yoyodyne, Inc., hereby disclaims all copyright interest in the program
   `Gnomovision' (which makes passes at compilers) written by James Hacker.
 
-<<<<<<< HEAD
-  <signature of Ty Coon>, 1 April 1989
-=======
   {signature of Ty Coon}, 1 April 1989
->>>>>>> 78db2b5f8efce6d4be9fc57007715d7ea52a9d1b
   Ty Coon, President of Vice
 
 This General Public License does not permit incorporating your program into

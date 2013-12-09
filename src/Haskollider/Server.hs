@@ -384,7 +384,7 @@ boot = do
 	lift $ putEnv "JACK_START_SERVER=true"
 	server <- get
 	(mstin, mstout, msterr, pHandle) <- lift $ 
-		createProcess (proc "scsynth" (optionsToCmdString $ serverOptions server))  { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe }
+		createProcess (System.Process.proc "scsynth" (optionsToCmdString $ serverOptions server))  { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe }
 	let stList = [mstin, mstout, msterr]
 	if (any (isNothing) stList) 
 		then do 

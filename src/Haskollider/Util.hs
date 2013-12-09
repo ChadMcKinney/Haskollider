@@ -4,6 +4,11 @@ module Haskollider.Util where
 import Control.Monad.State
 import Debug.Trace
 import Sound.OSC.Core
+import Data.Bits
+import Data.Int
+import Data.Word
+import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Lazy.Builder as BSB
 
 -- |Helper function to convert a Bool to Int for use in server Osc Messages
 flag :: Bool -> Int
@@ -30,3 +35,27 @@ testState x y = state (\s -> trace ("test: " ++ show (x == y)) (x, s))
 -- |Class for all sendable types, instanced by Synth, Group, Bus, and Buffer
 class ScSendable a where
 	newMsg :: a -> Message
+
+-- |Collect the values of a list from the given indexes. Safe lookup, won't break on out of bounds, will simply return any result who's index can be found in the 'is' list
+valuesAt :: [Int] -> [a] -> [a]
+valuesAt is x = map (\(x',_) -> x') . filter (\(_,i) -> i `elem` is) $ zip x [0..]	
+
+-- |Bit twiddling
+word8 :: (Integral a, Bits a) => a -> Word8
+word8 word = (fromIntegral $ word .&. 0xFF) :: Word8
+
+word16ToByteString :: Int16 -> BS.ByteString
+word16ToByteString = BSB.toLazyByteString . BSB.word16BE . fromIntegral
+
+word32ToByteString :: Int32 -> BS.ByteString
+word32ToByteString = BSB.toLazyByteString . BSB.word32BE . fromIntegral
+
+stringBytes :: String -> BS.ByteString
+stringBytes = BSB.toLazyByteString . BSB.stringUtf8
+
+-- |Print an array accross lines for easier reading
+arrayPrint :: (Show a) => [a] -> IO ()
+arrayPrint ar = do
+	putStr "[\n"
+	putStr . unlines . map (show) $ ar
+	putStr "]\n"

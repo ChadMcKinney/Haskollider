@@ -12,15 +12,18 @@ Build-Depends:      base >= 3 && < 5,
         			pretty       == 1.1.*,
         			stm          == 2.4.*,
         			transformers == 0.3.*,
-        			containers,
+                                containers,
         			vector,
         			hosc,
         			network,
                                 bits,
                                 time,
                                 process,
-                                unix
+                                unix,
+                                bytestring
 
+extensions:         FlexibleInstances InstanceSigs RankNTypes ExistentialQuantification Arrows
+ghc-options:        -threaded
 Data-Files:			DevNotes.txt
 hs-source-dirs:     src
 Exposed-modules:	Haskollider

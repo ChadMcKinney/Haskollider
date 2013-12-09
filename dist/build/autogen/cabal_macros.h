@@ -14,6 +14,13 @@
   (major1) == 0 && (major2) <  3 || \
   (major1) == 0 && (major2) == 3 && (minor) <= 3)
 
+/* package bytestring-0.10.0.2 */
+#define VERSION_bytestring "0.10.0.2"
+#define MIN_VERSION_bytestring(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  10 || \
+  (major1) == 0 && (major2) == 10 && (minor) <= 0)
+
 /* package containers-0.5.0.0 */
 #define VERSION_containers "0.5.0.0"
 #define MIN_VERSION_containers(major1,major2,minor) (\
@@ -35,12 +42,12 @@
   (major1) == 2 && (major2) <  1 || \
   (major1) == 2 && (major2) == 1 && (minor) <= 2)
 
-/* package network-2.4.1.2 */
-#define VERSION_network "2.4.1.2"
+/* package network-2.4.2.0 */
+#define VERSION_network "2.4.2.0"
 #define MIN_VERSION_network(major1,major2,minor) (\
   (major1) <  2 || \
   (major1) == 2 && (major2) <  4 || \
-  (major1) == 2 && (major2) == 4 && (minor) <= 1)
+  (major1) == 2 && (major2) == 4 && (minor) <= 2)
 
 /* package pretty-1.1.1.0 */
 #define VERSION_pretty "1.1.1.0"
@@ -84,10 +91,10 @@
   (major1) == 2 && (major2) <  6 || \
   (major1) == 2 && (major2) == 6 && (minor) <= 0)
 
-/* package vector-0.10.0.1 */
-#define VERSION_vector "0.10.0.1"
+/* package vector-0.10.9.1 */
+#define VERSION_vector "0.10.9.1"
 #define MIN_VERSION_vector(major1,major2,minor) (\
   (major1) <  0 || \
   (major1) == 0 && (major2) <  10 || \
-  (major1) == 0 && (major2) == 10 && (minor) <= 0)
+  (major1) == 0 && (major2) == 10 && (minor) <= 9)
 
